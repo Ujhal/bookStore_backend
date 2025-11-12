@@ -1,0 +1,87 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.py.class
+
+# =========================
+# Virtual Environments
+# =========================
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# =========================
+# Django Specific
+# =========================
+*.log
+*.pot
+*.pyc
+*.sqlite3
+db.sqlite3
+
+# Uploaded/media/static
+media/
+staticfiles/
+static_root/
+
+# Local override settings
+local_settings.py
+
+# =========================
+# IDEs & Editors
+# =========================
+.vscode/
+.idea/
+*.iml
+
+# =========================
+# OS junk
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Packaging / Build
+# =========================
+*.egg-info/
+.eggs/
+dist/
+build/
+*.manifest
+*.spec
+
+# =========================
+# Coverage / Testing
+# =========================
+.coverage
+.tox/
+nosetests.xml
+coverage.xml
+htmlcov/
+
+# =========================
+# Project-specific ignores
+# =========================
+
+# Ignore secrets (if you use .env files for DB, keys, etc.)
+*.env
+.env.*
+
+# If you generate logs inside apps
+django/core/*.log
+django/estimate_allocation/*.log
+django/operations/*.log
+django/spims/*.log
+django/stockManagement/*.log
+
+
+#migrations
+*/migrations/
