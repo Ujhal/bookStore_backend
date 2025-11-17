@@ -9,11 +9,10 @@ class User(AbstractUser):
     )
 
     # Custom role field to specify the user's role
-    role = models.CharField(
-        max_length=20, 
-        choices=ROLE_CHOICES, 
-        default='Customer'  # Default role is 'Customer'
-    )
+    role = models.IntegerField(
+    choices=ROLE_CHOICES,
+    default=2  # Customer
+)
     phone_number = models.CharField(max_length=15, unique=True, blank=True, null=True)  # Optional, but unique
 
 

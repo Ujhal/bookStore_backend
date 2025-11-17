@@ -8,6 +8,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('books.urls')),
+    path('api/', include('orders.urls')),
     path('api/auth/', include('accounts.urls')),
     path('api/cart/', include('cart.urls')),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
