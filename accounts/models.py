@@ -4,8 +4,10 @@ from django.contrib.auth.models import AbstractUser
 # Custom User model
 class User(AbstractUser):
     ROLE_CHOICES = (
-        (2, 'Customer'),
         (1, 'Admin'),
+        (2, 'Customer'),
+        (3, 'Publisher'),
+        
     )
 
     # Custom role field to specify the user's role

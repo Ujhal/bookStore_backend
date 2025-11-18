@@ -4,23 +4,33 @@ from django.contrib.auth import authenticate
 from .models import User,Address
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(required=False)  # Email is optional
-    phone_number = serializers.CharField(max_length=15, required=False)  # Phone number is optional, but must be unique if provided
+    email = serializers.EmailField(required=False)
+    phone_number = serializers.CharField(required=False)
     password = serializers.CharField(write_only=True)
 
     class Meta:
-        model = get_user_model()  # This gets the custom User model
-        fields = ['email', 'phone_number', 'password', 'role']
+        model = get_user_model()
+        fields = [
+            'first_name',
+            'last_name',
+            'email',
+            'phone_number',
+            'password',
+            'role',
+        ]
+        extra_kwargs = {
+            "role": {"required": False},
+            "first_name": {"required": True},
+            "last_name": {"required": True},
+        }
 
     def validate(self, data):
         email = data.get('email')
         phone_number = data.get('phone_number')
 
-        # At least one of email or phone number must be provided
         if not email and not phone_number:
             raise serializers.ValidationError("Either email or phone number is required.")
 
-        # Check if phone number is unique (if provided)
         if phone_number:
             if get_user_model().objects.filter(phone_number=phone_number).exists():
                 raise serializers.ValidationError("Phone number is already taken.")
@@ -30,21 +40,20 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         email = validated_data.get('email')
         phone_number = validated_data.get('phone_number')
-        
-        if email:
-            username = email  # Use email as username
-        else:
-            username = phone_number  # Use phone number as username
+        role = validated_data.get('role', 2)   # default role = Customer
+
+        username = email if email else phone_number
 
         user = get_user_model().objects.create_user(
-            username=username,  # Using phone number or email as username
+            username=username,
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
             email=email,
             phone_number=phone_number,
             password=validated_data['password'],
-            role=validated_data.get('role', 'Customer'),
+            role=role
         )
         return user
-
 
 
 class LoginSerializer(serializers.Serializer):
@@ -67,9 +76,20 @@ class LoginSerializer(serializers.Serializer):
         }
 
 class UserSerializer(serializers.ModelSerializer):
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'phone_number', 'role']
+        fields = [
+            'id',
+            'username',
+            'email',
+            'phone_number',
+            'first_name',
+            'last_name',
+            'role',
+            'role_display',
+        ]
 
 
 class AddressSerializer(serializers.ModelSerializer):

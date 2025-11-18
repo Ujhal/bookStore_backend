@@ -1,11 +1,42 @@
-from rest_framework import permissions
+# books/permissions.py
+from rest_framework.permissions import BasePermission
+import logging
 
-class IsAdminOrReadOnly(permissions.BasePermission):
-    def has_permission(self, request, view):
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        return request.user.is_authenticated and request.user.role == 'ADMIN'
+logger = logging.getLogger(__name__)
 
-class IsCustomer(permissions.BasePermission):
+class IsPublisher(BasePermission):
+    """
+    Allows access only to users with role 3 (Publisher)
+    """
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role == 'CUSTOMER'
+        user = request.user
+        try:
+            role = int(getattr(user, 'role', 0))  # cast to int
+        except (ValueError, TypeError):
+            role = 0
+
+        is_publisher = bool(user.is_authenticated and role == 3)
+
+        print(f"user.role: {user.role} ({type(user.role)})")
+        print(f"is_publisher: {is_publisher}")
+
+        return is_publisher
+
+
+class IsAdmin(BasePermission):
+    """
+    Allows access only to users with role 3 (Publisher)
+    """
+    def has_permission(self, request, view):
+        user = request.user
+        try:
+            role = int(getattr(user, 'role', 0))  # cast to int
+        except (ValueError, TypeError):
+            role = 0
+
+        is_admin = bool(user.is_authenticated and role == 1)
+
+        print(f"user.role: {user.role} ({type(user.role)})")
+        print(f"is_admin: {is_admin}")
+
+        return is_admin

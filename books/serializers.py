@@ -1,6 +1,10 @@
 import base64
 from rest_framework import serializers
 from .models import Book, Author, Category, SubCategory, Review
+import logging
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 class Base64BinaryField(serializers.Field):
     def to_internal_value(self, data):
@@ -25,7 +29,11 @@ class AuthorSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Author
-        fields = ['id', 'name', 'biography', 'date_of_birth', 'date_of_death', 'nationality', 'photo']
+        fields = [
+                    'id', 'name', 'biography', 'date_of_birth', 'date_of_death',
+                    'nationality', 'photo', 'status', 'created_by'
+                ]
+        read_only_fields = ['status', 'created_by']
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -39,6 +47,8 @@ class SubCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = SubCategory
         fields = ['id', 'name', 'description', 'category', 'category_name']
+
+
 
 class BookSerializer(serializers.ModelSerializer):
     author = serializers.PrimaryKeyRelatedField(queryset=Author.objects.all())
@@ -55,20 +65,15 @@ class BookSerializer(serializers.ModelSerializer):
     class Meta:
         model = Book
         fields = [
-            'id', 'title', 'author', 'description', 'price', 'currency', 'stock_quantity',
-            'cover_image', 'publisher', 'publication_date', 'language', 'pages', 'category', 
-            'subcategory', 'slug', 'created_at', 'updated_at','category_name', 'author_name',              # <--- add category_name here
-            'subcategory_name'
+            'id', 'title', 'author', 'description', 'price', 'currency',
+            'stock_quantity', 'cover_image', 'publisher', 'publication_date',
+            'language', 'pages', 'category', 'subcategory', 'slug',
+            'status', 'created_by', 'created_at', 'updated_at',
+            'author_name', 'category_name', 'subcategory_name','status'
         ]
+        read_only_fields = ['created_by', 'author_name', 'category_name', 'subcategory_name']
 
-    def validate_slug(self, value):
-        if self.instance:
-            if Book.objects.exclude(id=self.instance.id).filter(slug=value).exists():
-                raise serializers.ValidationError("Slug must be unique.")
-        else:
-            if Book.objects.filter(slug=value).exists():
-                raise serializers.ValidationError("Slug must be unique.")
-        return value
+   
 
 class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
