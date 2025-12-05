@@ -1,18 +1,25 @@
-from rest_framework import generics, permissions, status
-from rest_framework.response import Response
+# Django & Utilities
 from django.shortcuts import get_object_or_404
 from django.utils.crypto import get_random_string
-from .models import Order, OrderItem
-from .serializers import OrderSerializer, OrderItemSerializer,OrderSerializerSpecific
-from books.models import Book
-from accounts.models import Address  
-from rest_framework.views import APIView
-from .models import Order
-from .permissions import IsAdminUserOrSuperuser
-# 📦 Retrieve or Update a Specific Order
-from rest_framework.permissions import IsAuthenticated
-from .permissions import IsAdminUserOrSuperuser  # Assuming this custom permission is defined
 
+# DRF Core
+from rest_framework import generics, permissions, status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticated
+
+# JWT
+from rest_framework_simplejwt.tokens import RefreshToken
+
+# App Models & Serializers
+from accounts.models import User, Address
+from accounts.serializers import UserRegistrationSerializer, AddressSerializer
+
+from books.models import Book
+
+from .models import Order, OrderItem
+from .serializers import OrderSerializer, OrderItemSerializer, OrderSerializerSpecific
+from .permissions import IsAdminUserOrSuperuser
 
 # 📦 List and Create Orders
 class OrderAPIView(generics.ListCreateAPIView):
@@ -87,6 +94,90 @@ class OrderDetailAPIView(generics.RetrieveAPIView):
             raise Http404("Order not found.")
 
 
+
+
+
+class CheckoutRegisterAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+
+        data = request.data
+        
+        # ---------------------------
+        # 1. Register the user
+        # ---------------------------
+        user_serializer = UserRegistrationSerializer(data={
+            "first_name": data["first_name"],
+            "last_name": data["last_name"],
+            "email": data["email"],
+            "phone_number": data["phone_number"],
+            "password": data["password"],
+            "username": data["email"],     # optional but recommended
+            "role": 2
+        })
+
+        if not user_serializer.is_valid():
+            return Response(user_serializer.errors, status=400)
+
+        user = user_serializer.save()
+
+        # ---------------------------
+        # 2. Create Address
+        # ---------------------------
+        address = Address.objects.create(
+            user=user,
+            address_line_1=data["address_line_1"],
+            address_line_2=data.get("address_line_2", ""),
+            landmark=data.get("landmark", ""),
+            city=data["city"],
+            state=data["state"],
+            pincode=data["pincode"],
+            phone_number=data["phone_number"]
+        )
+
+        # ---------------------------
+        # 3. Create Order
+        # ---------------------------
+        try:
+            book = Book.objects.get(id=data["book_id"])
+        except Book.DoesNotExist:
+            return Response({"error": "Invalid book"}, status=400)
+
+        transaction_id = get_random_string(12)
+
+        order = Order.objects.create(
+            user=user,
+            shipping_address=address,
+            transaction_id=transaction_id,
+            total_amount=book.price * int(data["quantity"]),
+            status="Pending"
+        )
+
+        # ---------------------------
+        # 4. Create Order Item
+        # ---------------------------
+        OrderItem.objects.create(
+            order=order,
+            book=book,
+            quantity=data["quantity"],
+            price_per_unit=book.price
+        )
+
+        # ---------------------------
+        # 5. Generate JWT Token
+        # ---------------------------
+        refresh = RefreshToken.for_user(user)
+
+        # ---------------------------
+        # 6. Response
+        # ---------------------------
+        return Response({
+            "message": "User registered & order placed!",
+            "order_id": order.id,
+            "access_token": str(refresh.access_token),
+            "refresh_token": str(refresh),
+        }, status=201)
 
 # 🧾 Manage Order Items (Add Item to Order)
 class OrderItemAPIView(generics.CreateAPIView):
@@ -179,3 +270,4 @@ class AdminOrderByStatusAPIView(generics.ListAPIView):
         if status:
             queryset = queryset.filter(status=status)
         return queryset  
+

@@ -10,6 +10,7 @@ from .views import (
 
     ReviewAPIView,
     StatsAPIView,
+
     PublisherBooksAPIView,  # New publisher dashboard endpoint
     PublisherStatsAPIView,
     PublicBookAPIView,
@@ -75,4 +76,5 @@ urlpatterns = [
     # PUT/PATCH: update any book + approve
     path("admin/books/<int:pk>/update/", AdminBookUpdateAPIView.as_view(),
          name="admin-book-update"),
+         
 ]

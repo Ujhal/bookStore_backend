@@ -6,6 +6,10 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from rest_framework import generics, permissions
 from .models import Address
+from .models import User
+
+from django.db.models.functions import Cast
+from django.db.models import CharField
 
 
 from .serializers import UserRegistrationSerializer, LoginSerializer,UserSerializer,AddressSerializer
@@ -70,3 +74,19 @@ class AddressDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Address.objects.filter(user=self.request.user)
+
+
+
+class PublisherListView(generics.ListAPIView):
+    permission_classes = [AllowAny]  # or IsAuthenticated
+    serializer_class = UserSerializer
+
+    def get_queryset(self):
+        # Cast role (int) → string so it can match varchar column in database
+        return (
+            User.objects
+            .annotate(role_str=Cast("role", CharField()))
+            .filter(role_str="3")
+        )
+
+

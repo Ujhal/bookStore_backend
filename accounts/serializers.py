@@ -40,9 +40,15 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         email = validated_data.get('email')
         phone_number = validated_data.get('phone_number')
-        role = validated_data.get('role', 2)   # default role = Customer
+        role = validated_data.get('role', 2)  # default: Customer
 
         username = email if email else phone_number
+
+        # Set is_verified based on role
+        if role in [1, 2]:   # Admin or Customer
+            is_verified = True
+        else:                # Publisher
+            is_verified = False
 
         user = get_user_model().objects.create_user(
             username=username,
@@ -51,9 +57,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             email=email,
             phone_number=phone_number,
             password=validated_data['password'],
-            role=role
+            role=role,
+            is_verified=is_verified,
         )
         return user
+
 
 
 class LoginSerializer(serializers.Serializer):
@@ -89,6 +97,7 @@ class UserSerializer(serializers.ModelSerializer):
             'last_name',
             'role',
             'role_display',
+            'is_verified'
         ]
 
 

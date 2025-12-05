@@ -15,7 +15,9 @@ class User(AbstractUser):
     choices=ROLE_CHOICES,
     default=2  # Customer
 )
-    phone_number = models.CharField(max_length=15, unique=True, blank=True, null=True)  # Optional, but unique
+    phone_number = models.CharField(max_length=15, unique=True, blank=True, null=True)
+    is_verified = models.BooleanField(default=False)   # NEW FIELD
+
 
 
     def __str__(self):

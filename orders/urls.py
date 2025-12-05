@@ -1,10 +1,12 @@
 from django.urls import path
-from .views import OrderAPIView, OrderDetailAPIView, OrderItemAPIView, OrderCancelAPIView, AdminOrderStatusUpdateAPIView,AdminOrderListAPIView,AdminOrderByStatusAPIView
+from .views import OrderAPIView, CheckoutRegisterAPIView,OrderDetailAPIView, OrderItemAPIView, OrderCancelAPIView, AdminOrderStatusUpdateAPIView,AdminOrderListAPIView,AdminOrderByStatusAPIView
 
 urlpatterns = [
     # Orders
     path('orders/', OrderAPIView.as_view(), name='order-list-create'),
     
+    path('checkout-register/', CheckoutRegisterAPIView.as_view()),
+
 
     # Order Items
     path('orders/<int:order_id>/items/', OrderItemAPIView.as_view(), name='order-items'),
@@ -17,4 +19,5 @@ urlpatterns = [
     path('admin/orders/', AdminOrderListAPIView.as_view(), name='admin-order-list'),
     path('admin/orders/<int:pk>/', OrderDetailAPIView.as_view(), name='order-retrieve-update'),
     path('admin/orders-by-status/', AdminOrderByStatusAPIView.as_view(), name='admin-orders-by-status'),
+
 ]
