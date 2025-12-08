@@ -24,9 +24,13 @@ class CartView(APIView):
         item.quantity += quantity
         item.save()
 
+
         return Response({"detail": f"{book.title} added to cart."}, status=status.HTTP_200_OK)
     
     def delete(self, request, book_id=None):
         cart = Cart.objects.get(user=request.user)
-        CartItem.objects.filter(cart=cart, book_id=book_id).delete()
-        return Response({"detail": "Item removed from cart."}, status=status.HTTP_204_NO_CONTENT)
+        deleted, _ = CartItem.objects.filter(cart=cart, book_id=book_id).delete()
+        if deleted:
+            return Response({"detail": "Item removed from cart."}, status=status.HTTP_204_NO_CONTENT)
+        return Response({"detail": "Item not found in cart."}, status=status.HTTP_404_NOT_FOUND)
+

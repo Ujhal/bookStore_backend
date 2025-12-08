@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import OrderAPIView, CheckoutRegisterAPIView,OrderDetailAPIView, OrderItemAPIView, OrderCancelAPIView, AdminOrderStatusUpdateAPIView,AdminOrderListAPIView,AdminOrderByStatusAPIView
+from .views import OrderAPIView, CheckoutRegisterAPIView,OrderDetailAPIView, OrderItemAPIView, OrderCancelAPIView, AdminOrderStatusUpdateAPIView,  AdminForwardOrderAPIView,PublisherSubOrderListAPIView,PublisherSubOrderUpdateAPIView,AdminOrderListAPIView,AdminOrderByStatusAPIView,PublisherSubOrderByStatusAPIView,SubOrderDetailAPIView
 
 urlpatterns = [
     # Orders
@@ -19,5 +19,15 @@ urlpatterns = [
     path('admin/orders/', AdminOrderListAPIView.as_view(), name='admin-order-list'),
     path('admin/orders/<int:pk>/', OrderDetailAPIView.as_view(), name='order-retrieve-update'),
     path('admin/orders-by-status/', AdminOrderByStatusAPIView.as_view(), name='admin-orders-by-status'),
+
+    path('admin/order/<int:pk>/forward/', AdminForwardOrderAPIView.as_view()),
+
+    # Publisher Routes
+    path('publisher/suborders/', PublisherSubOrderListAPIView.as_view()),
+    path('publisher/suborder/<int:pk>/update/', PublisherSubOrderUpdateAPIView.as_view()),
+    
+    path( "publisher/suborders/status/",PublisherSubOrderByStatusAPIView.as_view(),name="publisher-suborders-by-status"),
+    path("publisher/suborders/<int:id>/",SubOrderDetailAPIView.as_view(),name="publisher-suborder-detail"
+),
 
 ]

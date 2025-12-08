@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
-    AuthorAPIView,
+    AuthorUpdateAPIView,
+    AuthorListCreateAPIView,
     CategoryAPIView,
     SubCategoryAPIView,
 
@@ -22,8 +23,8 @@ from .views import (
 
 urlpatterns = [
     # Author Endpoints
-    path('authors/', AuthorAPIView.as_view(), name='authors-list-create'),
-    path('authors/<int:pk>/', AuthorAPIView.as_view(), name='authors-detail'),
+    path('authors/', AuthorListCreateAPIView.as_view(), name='author-list-create'),
+    path('authors/<int:pk>/', AuthorUpdateAPIView.as_view(), name='author-detail-update'),
 
     # Category Endpoints
     path('categories/', CategoryAPIView.as_view(), name='categories-list-create'),

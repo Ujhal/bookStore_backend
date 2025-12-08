@@ -24,58 +24,70 @@ from .serializers import (
 #                                   AUTHOR API
 # =====================================================================================
 
-class AuthorAPIView(APIView):
+
+class AuthorListCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, *args, **kwargs):
-        author_id = kwargs.get('pk', None)
-
-        # Return all authors without any restrictions
+    def get(self, request, pk=None):
+        """
+        List all authors or retrieve a specific author.
+        Publishers can see all authors.
+        """
         authors = Author.objects.all()
 
-        if author_id:
+        if pk:
             try:
-                author = authors.get(id=author_id)
+                author = authors.get(id=pk)
             except Author.DoesNotExist:
                 return Response({"detail": "Author not found."}, status=status.HTTP_404_NOT_FOUND)
             return Response(AuthorSerializer(author).data)
 
         return Response(AuthorSerializer(authors, many=True).data)
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request):
+        """
+        Create an author.
+        Publisher: status = 'pending'
+        Admin: can set any status
+        """
         serializer = AuthorSerializer(data=request.data)
         if serializer.is_valid():
             user = request.user
-
-            if is_publisher(user):
+            if IsPublisher().has_permission(request, self):
                 serializer.save(status='pending', created_by=user)
-            else:
-                serializer.save(status='approved', created_by=user)
-
+            else:  # Admin or others
+                serializer.save(created_by=user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def patch(self, request, *args, **kwargs):
-        author_id = kwargs.get('pk')
+
+class AuthorUpdateAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        return self._update(request, pk, partial=True)
+
+    def put(self, request, pk):
+        return self._update(request, pk, partial=False)
+
+    def _update(self, request, pk, partial):
         try:
-            author = Author.objects.get(id=author_id)
+            author = Author.objects.get(id=pk)
         except Author.DoesNotExist:
             return Response({"detail": "Author not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Prevent publisher from approving/rejecting
-        if "status" in request.data and not is_admin(request.user):
+        # Publishers cannot approve/reject authors
+        if "status" in request.data and IsPublisher().has_permission(request, self):
             return Response({"detail": "Only admin can approve or reject."},
                             status=status.HTTP_403_FORBIDDEN)
 
-        serializer = AuthorSerializer(author, data=request.data, partial=True)
+        serializer = AuthorSerializer(author, data=request.data, partial=partial)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 # =====================================================================================
 #                                   CATEGORY API
 # =====================================================================================
@@ -241,7 +253,7 @@ class PublisherBookCreateAPIView(APIView):
 
         if serializer.is_valid():
             # Save the book instance with the modified status
-            serializer.save()
+            serializer.save(created_by=user,is_publisher=True)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -294,7 +306,7 @@ class AdminBookCreateAPIView(APIView):
 
         if serializer.is_valid():
             # Admin can set any status provided by the frontend
-            serializer.save()
+            serializer.save(created_by=user, is_publisher=False)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

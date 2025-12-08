@@ -1,11 +1,12 @@
 from rest_framework import serializers
 from .models import Cart, CartItem
 from books.serializers import BookSerializer
+from books.models import Book
 
 class CartItemSerializer(serializers.ModelSerializer):
     book = BookSerializer(read_only=True)
     book_id = serializers.PrimaryKeyRelatedField(
-        source='book', queryset=CartItem.objects.all(), write_only=True
+        source='book', queryset=Book.objects.all(), write_only=True
     )
 
     class Meta:

@@ -69,7 +69,7 @@ class BookSerializer(serializers.ModelSerializer):
             'stock_quantity', 'cover_image', 'publisher', 'publication_date',
             'language', 'pages', 'category', 'subcategory', 'slug',
             'status', 'created_by', 'created_at', 'updated_at',
-            'author_name', 'category_name', 'subcategory_name','status'
+            'author_name', 'category_name', 'subcategory_name','status','is_publisher',
         ]
         read_only_fields = ['created_by', 'author_name', 'category_name', 'subcategory_name']
 
