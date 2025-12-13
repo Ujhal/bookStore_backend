@@ -1,6 +1,9 @@
 # Django & Utilities
 from django.shortcuts import get_object_or_404
 from django.utils.crypto import get_random_string
+from .pagination import OrderPagination
+
+ # Sort by ID descending
 
 # DRF Core
 from rest_framework import generics, permissions, status
@@ -19,7 +22,7 @@ from books.models import Book
 
 from .models import Order, OrderItem,SubOrder
 from .serializers import OrderSerializer, OrderItemSerializer, OrderSerializerSpecific,SubOrderSerializer,SubOrderDetailSerializer
-from .permissions import IsAdminUserOrSuperuser
+from .permissions import IsAdminUserOrSuperuser,IsPublisher
 
 
 class OrderAPIView(generics.ListCreateAPIView):
@@ -30,6 +33,11 @@ class OrderAPIView(generics.ListCreateAPIView):
         print("\n[DEBUG] Fetching orders for user:", self.request.user.username)
         return Order.objects.filter(user=self.request.user).order_by('-created_at')
 
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return OrderSerializerSpecific  # Use serializer with suborders
+        return OrderSerializer  
+    
     def create(self, request, *args, **kwargs):
         user = request.user
         print("\n[DEBUG] Order creation requested by:", user.username)
@@ -290,18 +298,21 @@ class AdminOrderStatusUpdateAPIView(APIView):
         return Response(serializer.data, status=200)
 
     
+
 class AdminOrderListAPIView(generics.ListAPIView):
     permission_classes = [IsAdminUserOrSuperuser]
     serializer_class = OrderSerializer
+    pagination_class = OrderPagination  # <-- Add this
 
     def get_queryset(self):
-        return Order.objects.all().order_by('-created_at')
+        return Order.objects.all().order_by('id')  
 
 
 class AdminOrderByStatusAPIView(generics.ListAPIView):
     serializer_class = OrderSerializer
     permission_classes = [IsAdminUserOrSuperuser]
-
+    pagination_class = OrderPagination
+    
     def get_queryset(self):
         status = self.request.query_params.get('status')
         queryset = Order.objects.all().order_by('-created_at')
@@ -339,35 +350,37 @@ class AdminForwardOrderAPIView(APIView):
 
 
 class PublisherSubOrderUpdateAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsPublisher]  # Only role=3 can access
 
     def patch(self, request, pk):
         try:
+            # Ensure the suborder belongs to the logged-in publisher
             suborder = SubOrder.objects.get(id=pk, publisher=request.user)
         except SubOrder.DoesNotExist:
-            return Response({'error': 'SubOrder not found'}, status=404)
+            return Response({'error': 'SubOrder not found or not assigned to you'}, status=404)
 
         status = request.data.get('status')
         tracking = request.data.get('tracking_number')
         remarks = request.data.get('remarks')
 
-        if status not in dict(Order.STATUS_CHOICES):
+        # Validate status
+        if status and status not in dict(Order.STATUS_CHOICES):
             return Response({'error': 'Invalid status'}, status=400)
 
-        # Validation
+        # If status is Shipped, tracking number is required
         if status == 'Shipped' and not tracking:
             return Response({'error': 'Tracking number required'}, status=400)
 
-        suborder.status = status
+        # Update fields if provided
+        if status:
+            suborder.status = status
         if tracking:
             suborder.tracking_number = tracking
-        if remarks:
+        if remarks is not None:  # allow clearing remarks
             suborder.remarks = remarks
 
         suborder.save()
         return Response(SubOrderSerializer(suborder).data)
-
-
 
 class PublisherSubOrderListAPIView(generics.ListAPIView):
     serializer_class = SubOrderSerializer

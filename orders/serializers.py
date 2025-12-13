@@ -48,11 +48,10 @@ class OrderSerializer(serializers.ModelSerializer):
             'order_date', 'created_at', 'updated_at'
         ]
 
-               
 class OrderSerializerSpecific(serializers.ModelSerializer):
     user = UserMiniSerializer(read_only=True)
     shipping_address = AddressSerializer(read_only=True)
-    order_items = OrderItemSerializer(many=True, read_only=True)
+    sub_orders = serializers.SerializerMethodField()  # Custom representation
 
     class Meta:
         model = Order
@@ -66,9 +65,45 @@ class OrderSerializerSpecific(serializers.ModelSerializer):
             'order_date',
             'created_at',
             'updated_at',
-            'order_items','remarks'
+            'sub_orders',
+            'remarks'
         ]
-        
+
+    def get_sub_orders(self, obj):
+        """
+        Custom representation of sub-orders to include:
+        - publisher info
+        - status, tracking_number, remarks
+        - items assigned to that publisher
+        Avoid duplicating main order_items
+        """
+        suborders_list = []
+        for sub in obj.sub_orders.all():
+            # Only include minimal item info
+            items = sub.order.order_items.filter(assigned_to=sub.publisher).values(
+                'id',
+                'book__title',
+                'quantity',
+                'total_price'
+            )
+            suborders_list.append({
+                'id': sub.id,
+                'publisher': {
+                    'id': sub.publisher.id,
+                    'username': sub.publisher.username,
+                    'email': sub.publisher.email,
+                    'role': sub.publisher.role,
+                    'phone_number': sub.publisher.phone_number
+                },
+                'status': sub.status,
+                'tracking_number': sub.tracking_number,
+                'remarks': sub.remarks,
+                'created_at': sub.created_at,
+                'items': list(items)
+            })
+        return suborders_list
+
+
 class SubOrderItemSerializer(serializers.ModelSerializer):
     book = BookMiniSerializer(read_only=True)
 

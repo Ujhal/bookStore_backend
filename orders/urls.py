@@ -26,7 +26,7 @@ urlpatterns = [
     path('publisher/suborders/', PublisherSubOrderListAPIView.as_view()),
     path('publisher/suborder/<int:pk>/update/', PublisherSubOrderUpdateAPIView.as_view()),
     
-    path( "publisher/suborders/status/",PublisherSubOrderByStatusAPIView.as_view(),name="publisher-suborders-by-status"),
+    path("publisher/suborders/status/",PublisherSubOrderByStatusAPIView.as_view(),name="publisher-suborders-by-status"),
     path("publisher/suborders/<int:id>/",SubOrderDetailAPIView.as_view(),name="publisher-suborder-detail"
 ),
 
