@@ -77,6 +77,9 @@ class LoginSerializer(serializers.Serializer):
 
         if not user:
             raise serializers.ValidationError("Invalid credentials.")
+        
+        if user.is_deleted:
+            raise serializers.ValidationError("This account has been deleted.")
 
         return {
             'user': user,

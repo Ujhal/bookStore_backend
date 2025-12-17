@@ -16,7 +16,9 @@ class User(AbstractUser):
     default=2  # Customer
 )
     phone_number = models.CharField(max_length=15, unique=True, blank=True, null=True)
-    is_verified = models.BooleanField(default=False)   # NEW FIELD
+    is_verified = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+
 
 
 

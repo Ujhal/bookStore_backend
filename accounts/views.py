@@ -10,7 +10,8 @@ from .models import User
 
 from django.db.models.functions import Cast
 from django.db.models import CharField
-
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .tokens import MyTokenObtainPairSerializer
 
 from .serializers import UserRegistrationSerializer, LoginSerializer,UserSerializer,AddressSerializer
 
@@ -90,3 +91,59 @@ class PublisherListView(generics.ListAPIView):
         )
 
 
+class SelfDeleteUserView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        user = request.user
+        user.is_deleted = True
+        user.is_active = False  # optional but recommended
+        user.save()
+
+        return Response(
+            {"message": "Your account has been deleted successfully."},
+            status=status.HTTP_200_OK
+        )
+        
+class AdminDeleteUserView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, user_id):
+        if request.user.role != 1:
+            return Response(
+                {"error": "Only admin can delete users."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            user = User.objects.get(id=user_id, is_deleted=False)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found or already deleted."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        user.is_deleted = True
+        user.is_active = False
+        user.save()
+
+        return Response(
+            {"message": "User deleted successfully."},
+            status=status.HTTP_200_OK
+        )
+        
+class MyProfileView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        if user.is_deleted:
+            return Response(
+                {"error": "Account deleted"},
+                status=403
+            )
+
+        serializer = UserSerializer(user)
+        return Response(serializer.data)        
+    
