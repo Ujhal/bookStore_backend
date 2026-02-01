@@ -4,10 +4,6 @@ from books.models import Book
 from accounts.models import Address 
 from accounts.models import User
 
-
-
-
-
  
 class BookMiniSerializer(serializers.ModelSerializer):
     class Meta:
@@ -41,7 +37,7 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'shipping_address', 'transaction_id', 'total_amount',
             'status', 'order_date', 'created_at', 'updated_at',
-            'tracking_number', 'remarks', 'order_items'
+            'tracking_number', 'remarks', 'order_items','delivery_charge'
         ]
         read_only_fields = [
             'id', 'user', 'transaction_id', 'total_amount',
@@ -61,12 +57,14 @@ class OrderSerializerSpecific(serializers.ModelSerializer):
             'shipping_address',
             'transaction_id',
             'total_amount',
+            'delivery_charge',
             'status',
             'order_date',
             'created_at',
             'updated_at',
             'sub_orders',
-            'remarks'
+            'remarks',
+            'invoice_pdf'
         ]
 
     def get_sub_orders(self, obj):
@@ -113,21 +111,33 @@ class SubOrderItemSerializer(serializers.ModelSerializer):
 
 class SubOrderSerializer(serializers.ModelSerializer):
     publisher = UserMiniSerializer(read_only=True)
+    order_id = serializers.IntegerField(source='order.id', read_only=True)
+    suborder_id = serializers.IntegerField(source='id', read_only=True)
+    transaction_id = serializers.CharField(source='order.transaction_id', read_only=True)
+
     items = serializers.SerializerMethodField()
 
     class Meta:
         model = SubOrder
         fields = [
-            'id', 'order', 'publisher', 'status',
-            'tracking_number', 'remarks', 'created_at',
-            'items'
+            'suborder_id',
+            'order_id',
+            'publisher',
+            'status',
+            'tracking_number',
+            'remarks',
+            'created_at',
+            'items',
+            'transaction_id'
         ]
 
     def get_items(self, obj):
-        queryset = OrderItem.objects.filter(order=obj.order, assigned_to=obj.publisher)
+        queryset = OrderItem.objects.filter(
+            order=obj.order,
+            assigned_to=obj.publisher
+        )
         return SubOrderItemSerializer(queryset, many=True).data
-    
-    
+
 class SubOrderDetailSerializer(serializers.ModelSerializer):
     publisher = UserMiniSerializer(read_only=True)
     items = serializers.SerializerMethodField()
@@ -169,4 +179,49 @@ class SubOrderDetailSerializer(serializers.ModelSerializer):
             return AddressSerializer(address).data
         return None
 
-    
+class OrderSummarySerializer(serializers.ModelSerializer):
+    order_id = serializers.IntegerField(source='id')  # Map 'id' to 'order_id'
+
+    class Meta:
+        model = Order
+        fields = ['order_id', 'order_date', 'status', 'transaction_id']
+        read_only_fields = fields   
+
+
+class UserOrderDetailSerializer(serializers.ModelSerializer):
+    sub_orders = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = [
+            'id',
+            'transaction_id',
+            'total_amount',
+            'status',
+            'order_date',
+            'remarks',
+            'sub_orders',
+            'invoice_pdf'
+        ]
+
+    def get_sub_orders(self, obj):
+        suborders_data = []
+
+        for sub in obj.sub_orders.all():
+            items = sub.order.order_items.filter(
+                assigned_to=sub.publisher
+            ).select_related('book').values(
+                'id',
+                'book__title',
+                'quantity'
+            )
+
+            suborders_data.append({
+                'id': sub.id,
+                'status': sub.status,
+                'tracking_number': sub.tracking_number,
+                'created_at': sub.created_at,
+                'items': list(items)
+            })
+
+        return suborders_data

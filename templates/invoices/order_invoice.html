@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 13px;
+            color: #333;
+        }
+
+        .header {
+            width: 100%;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+
+        .logo {
+            width: 150px;
+        }
+
+       
+
+        h2 {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            border: 1px solid #999;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        .total {
+            text-align: right;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<table class="header">
+    <tr>
+        <td>
+           <strong>Read good Books</strong><br>
+            North east digital consultancy services
+        </td>
+       
+    </tr>
+</table>
+
+<h2>INVOICE</h2>
+
+<!-- ORDER DETAILS -->
+<table>
+    <tr>
+        <td><strong>Invoice No:</strong> ORD-{{ order.id }}</td>
+        <td><strong>Invoice Date:</strong> {{ order.created_at|date:"d M Y" }}</td>
+    </tr>
+    <tr>
+        <td><strong>Customer:</strong> {{ order.user.username }}</td>
+        <td><strong>Transaction ID:</strong>
+            {{ order.payment.transaction_id }}
+        </td>
+    </tr>
+</table>
+
+<!-- ITEMS -->
+<table>
+    <tr>
+        <th>Book</th>
+        <th>Quantity</th>
+        <th>Price (₹)</th>
+        <th>Total (₹)</th>
+    </tr>
+
+    {% for item in items %}
+    <tr>
+        <td>{{ item.book.title }}</td>
+        <td>{{ item.quantity }}</td>
+        <td>{{ item.price_per_unit }}</td>
+        <td>{{ item.total_price }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<!-- TOTAL -->
+<div class="total">
+    <p><strong>Delivery Charge:</strong> ₹{{ order.delivery_charge }}</p>
+    <p><strong>Total Amount Paid:</strong> ₹{{ order.total_amount }}</p>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+    <p>This is a system generated invoice.</p>
+    <p>Thank you for your purchase!</p>
+</div>
+
+</body>
+</html>

@@ -26,10 +26,32 @@ class Order(models.Model):
     order_date = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    invoice_pdf = models.FileField(upload_to="invoices/orders/", blank=True, null=True)
+
+    payment_status = models.CharField(
+        max_length=20,
+        choices=(
+            ('Pending', 'Pending'),
+            ('Paid', 'Paid'),
+            ('Failed', 'Failed'),
+        ),
+        default='Pending'
+    )
+    delivery_charge = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00
+    )
+
+    razorpay_order_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True
+    )
 
     def update_total_amount(self):
         total = sum(item.total_price for item in self.order_items.all())
-        self.total_amount = total
+        self.total_amount = total + self.delivery_charge
         self.save(update_fields=['total_amount'])
 
     def __str__(self):
@@ -50,7 +72,7 @@ class OrderItem(models.Model):
         related_name='assigned_order_items'
     )
 
-    forwarded = models.BooleanField(default=False)
+    
 
     def __str__(self):
         return f"{self.book.title} x{self.quantity}"
@@ -63,6 +85,8 @@ class SubOrder(models.Model):
     status = models.CharField(max_length=20, choices=Order.STATUS_CHOICES, default='Pending')
     tracking_number = models.CharField(max_length=50, blank=True, null=True)
     remarks = models.TextField(blank=True, null=True)
+    
+    invoice_pdf = models.FileField(upload_to="invoices/suborders/", blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

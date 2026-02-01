@@ -53,6 +53,7 @@ class SubCategorySerializer(serializers.ModelSerializer):
 class BookSerializer(serializers.ModelSerializer):
     author = serializers.PrimaryKeyRelatedField(queryset=Author.objects.all())
     author_name = serializers.CharField(source='author.name', read_only=True)
+    author_bio=serializers.CharField(source='author.biography', read_only=True)
 
     category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
     category_name = serializers.CharField(source='category.name', read_only=True)
@@ -69,9 +70,9 @@ class BookSerializer(serializers.ModelSerializer):
             'stock_quantity', 'cover_image', 'publisher', 'publication_date',
             'language', 'pages', 'category', 'subcategory', 'slug',
             'status', 'created_by', 'created_at', 'updated_at',
-            'author_name', 'category_name', 'subcategory_name','status','is_publisher',
+            'author_name', 'author_bio', 'category_name', 'subcategory_name','status','is_publisher',
         ]
-        read_only_fields = ['created_by', 'author_name', 'category_name', 'subcategory_name']
+        read_only_fields = ['created_by', 'author_name','author_bio', 'category_name', 'subcategory_name']
 
    
 

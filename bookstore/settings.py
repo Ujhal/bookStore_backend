@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'accounts',
     'orders',
     'cart',
+    'payments',
 ]   
 
 MIDDLEWARE = [
@@ -52,7 +53,7 @@ ROOT_URLCONF = 'bookstore.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -71,7 +72,7 @@ WSGI_APPLICATION = 'bookstore.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'bookStore_db',
+        'NAME': 'bookstore_db',
         'USER': 'postgres',
         'PASSWORD': 'postgres',
         'HOST': 'localhost',
@@ -150,3 +151,10 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+
+
+RAZORPAY_KEY_ID = "rzp_test_RhwKEvKsytCZgP"
+RAZORPAY_KEY_SECRET = "g9JTy9CkRhFdpTOQsQlSfrlg"
+RAZORPAY_CURRENCY = "INR"
+RAZORPAY_PAYMENT_CAPTURE = 1  # Auto-capture payments

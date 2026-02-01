@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth import authenticate
-from .models import User,Address
+from .models import User,Address,State
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=False)
@@ -119,3 +119,8 @@ class AddressSerializer(serializers.ModelSerializer):
             'phone_number',
         ]
         read_only_fields = ['id', 'user']
+
+class StateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = State
+        fields = ['id', 'name', 'code']

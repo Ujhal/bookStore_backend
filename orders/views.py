@@ -2,6 +2,7 @@
 from django.shortcuts import get_object_or_404
 from django.utils.crypto import get_random_string
 from .pagination import OrderPagination
+from decimal import Decimal
 
  # Sort by ID descending
 
@@ -17,61 +18,59 @@ from rest_framework_simplejwt.tokens import RefreshToken
 # App Models & Serializers
 from accounts.models import User, Address
 from accounts.serializers import UserRegistrationSerializer, AddressSerializer
+from django.contrib.auth import get_user_model
+from django.db import transaction
+
+
 
 from books.models import Book
 
 from .models import Order, OrderItem,SubOrder
-from .serializers import OrderSerializer, OrderItemSerializer, OrderSerializerSpecific,SubOrderSerializer,SubOrderDetailSerializer
-from .permissions import IsAdminUserOrSuperuser,IsPublisher
-
+from .serializers import OrderSerializer, OrderItemSerializer, OrderSerializerSpecific,SubOrderSerializer,UserOrderDetailSerializer,SubOrderDetailSerializer,OrderSummarySerializer
+from .permissions import IsAdminUserOrSuperuser,IsPublisher,IsPublisherOrAdmin
 
 class OrderAPIView(generics.ListCreateAPIView):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        print("\n[DEBUG] Fetching orders for user:", self.request.user.username)
-        return Order.objects.filter(user=self.request.user).order_by('-created_at')
-
-    def get_serializer_class(self):
-        if self.request.method == 'GET':
-            return OrderSerializerSpecific  # Use serializer with suborders
-        return OrderSerializer  
-    
     def create(self, request, *args, **kwargs):
         user = request.user
-        print("\n[DEBUG] Order creation requested by:", user.username)
-
         address_id = request.data.get('address_id')
         items = request.data.get('items', None)
 
-        # Validate address
         try:
             address = Address.objects.get(id=address_id, user=user)
         except Address.DoesNotExist:
             return Response({'error': 'Invalid address'}, status=400)
 
-        transaction_id = get_random_string(12)
+        # 🚚 Delivery charge logic
+        delivery_charge = Decimal("0.00")
+        if address.state.code != "SK":  # Not Sikkim
+            delivery_charge = Decimal("100.00")
+
         order = Order.objects.create(
             user=user,
             shipping_address=address,
-            transaction_id=transaction_id,
-            status='Pending'
+            status='Pending',
+            delivery_charge=delivery_charge
         )
 
         from collections import defaultdict
         items_by_stakeholder = defaultdict(list)
 
-        # CASE 1: multi-item payload
         if items is not None:
             for item_data in items:
                 book_id = item_data.get('book_id')
                 quantity = int(item_data.get('quantity', 1))
+
                 try:
                     book = Book.objects.get(id=book_id)
                 except Book.DoesNotExist:
                     order.delete()
-                    return Response({'error': f'Invalid book ID: {book_id}'}, status=400)
+                    return Response(
+                        {'error': f'Invalid book ID: {book_id}'},
+                        status=400
+                    )
 
                 order_item = OrderItem.objects.create(
                     order=order,
@@ -81,40 +80,19 @@ class OrderAPIView(generics.ListCreateAPIView):
                     total_price=book.price * quantity,
                     assigned_to=book.created_by
                 )
+
                 items_by_stakeholder[book.created_by].append(order_item)
 
-        # CASE 2: single-item payload
-        else:
-            book_id = request.data.get('book_id')
-            quantity = int(request.data.get('quantity', 1))
-            try:
-                book = Book.objects.get(id=book_id)
-            except Book.DoesNotExist:
-                order.delete()
-                return Response({'error': f'Invalid book ID: {book_id}'}, status=400)
-
-            order_item = OrderItem.objects.create(
-                order=order,
-                book=book,
-                quantity=quantity,
-                price_per_unit=book.price,
-                total_price=book.price * quantity,
-                assigned_to=book.created_by
-            )
-            items_by_stakeholder[book.created_by].append(order_item)
-
-        # Update total and create suborders
+        # ✅ Update total including delivery
         order.update_total_amount()
-        for stakeholder, stakeholder_items in items_by_stakeholder.items():
-            if stakeholder:
-                SubOrder.objects.create(
-                    order=order,
-                    publisher=stakeholder,
-                    status='Pending'
-                )
 
-        serializer = self.get_serializer(order)
-        return Response(serializer.data, status=201)
+        return Response({
+            "order_id": order.id,
+            "items_total": order.total_amount - order.delivery_charge,
+            "delivery_charge": order.delivery_charge,
+            "total_amount": order.total_amount,
+            "status": order.status
+        }, status=201)
 
 
 class OrderDetailAPIView(generics.RetrieveAPIView):
@@ -146,83 +124,122 @@ class CheckoutRegisterAPIView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-
         data = request.data
-        
-        # ---------------------------
-        # 1. Register the user
-        # ---------------------------
-        user_serializer = UserRegistrationSerializer(data={
-            "first_name": data["first_name"],
-            "last_name": data["last_name"],
-            "email": data["email"],
-            "phone_number": data["phone_number"],
-            "password": data["password"],
-            "username": data["email"],     # optional but recommended
-            "role": 2
-        })
+        User = get_user_model()
 
-        if not user_serializer.is_valid():
-            return Response(user_serializer.errors, status=400)
-
-        user = user_serializer.save()
+        email = data.get("email")
+        phone = data.get("phone_number")
 
         # ---------------------------
-        # 2. Create Address
+        # 1️⃣ Duplicate user check
         # ---------------------------
-        address = Address.objects.create(
-            user=user,
-            address_line_1=data["address_line_1"],
-            address_line_2=data.get("address_line_2", ""),
-            landmark=data.get("landmark", ""),
-            city=data["city"],
-            state=data["state"],
-            pincode=data["pincode"],
-            phone_number=data["phone_number"]
-        )
+        if email and User.objects.filter(email=email).exists():
+            return Response(
+                {"error": "Email already registered. Please login."},
+                status=400
+            )
 
-        # ---------------------------
-        # 3. Create Order
-        # ---------------------------
+        if phone and User.objects.filter(phone_number=phone).exists():
+            return Response(
+                {"error": "Phone number already registered. Please login."},
+                status=400
+            )
+
+        items = data.get("items", [])
+        if not items:
+            return Response({"error": "Cart is empty"}, status=400)
+
         try:
-            book = Book.objects.get(id=data["book_id"])
+            with transaction.atomic():
+
+                # ---------------------------
+                # 2️⃣ Create User
+                # ---------------------------
+                user_serializer = UserRegistrationSerializer(data={
+                    "first_name": data["first_name"],
+                    "last_name": data["last_name"],
+                    "email": email,
+                    "phone_number": phone,
+                    "password": data["password"],
+                    "role": 2
+                })
+                user_serializer.is_valid(raise_exception=True)
+                user = user_serializer.save()
+
+                # ---------------------------
+                # 3️⃣ Create Address
+                # ---------------------------
+                address = Address.objects.create(
+                    user=user,
+                    address_line_1=data["address_line_1"],
+                    address_line_2=data.get("address_line_2", ""),
+                    landmark=data.get("landmark", ""),
+                    city=data["city"],
+                    state_id=data["state"],
+                    pincode=data["pincode"],
+                    phone_number=phone
+                )
+
+                # ---------------------------
+                # 4️⃣ Delivery Charge Logic
+                # ---------------------------
+                delivery_charge = Decimal("0.00")
+                if address.state.code != "SK":
+                    delivery_charge = Decimal("100.00")
+
+                # ---------------------------
+                # 5️⃣ Create Order
+                # ---------------------------
+                order = Order.objects.create(
+                    user=user,
+                    shipping_address=address,
+                    status="Pending",
+                    delivery_charge=delivery_charge,
+                    transaction_id=get_random_string(12)
+                )
+
+                # ---------------------------
+                # 6️⃣ Create Order Items
+                # ---------------------------
+                for item in items:
+                    book = Book.objects.get(id=item["book_id"])
+                    quantity = int(item.get("quantity", 1))
+
+                    OrderItem.objects.create(
+                        order=order,
+                        book=book,
+                        quantity=quantity,
+                        price_per_unit=book.price,
+                        total_price=book.price * quantity,
+                        assigned_to=book.created_by
+                    )
+
+                # ---------------------------
+                # 7️⃣ Update Order Total
+                # ---------------------------
+                order.update_total_amount()
+
+                # ---------------------------
+                # 8️⃣ Generate JWT Tokens
+                # ---------------------------
+                refresh = RefreshToken.for_user(user)
+
+                return Response({
+                    "message": "User registered & order placed successfully",
+                    "order_id": order.id,
+                    "total_amount": order.total_amount,
+                    "access_token": str(refresh.access_token),
+                    "refresh_token": str(refresh),
+                }, status=201)
+
         except Book.DoesNotExist:
-            return Response({"error": "Invalid book"}, status=400)
+            return Response({"error": "Invalid book in cart"}, status=400)
 
-        transaction_id = get_random_string(12)
-
-        order = Order.objects.create(
-            user=user,
-            shipping_address=address,
-            transaction_id=transaction_id,
-            total_amount=book.price * int(data["quantity"]),
-            status="Pending"
-        )
-
-        # ---------------------------
-        # 4. Create Order Item
-        # ---------------------------
-        OrderItem.objects.create(
-            order=order,
-            book=book,
-            quantity=data["quantity"],
-            price_per_unit=book.price
-        )
-
-        # ---------------------------
-        # 5. Generate JWT Token
-        # ---------------------------
-        refresh = RefreshToken.for_user(user)
-
-        # ---------------------------
-        # 6. Response
-        # ---------------------------
-        return Response({
-            "message": "User registered & order placed!",
-            "order_id": order.id,
-            "access_token": str(refresh.access_token),
-            "refresh_token": str(refresh),
-        }, status=201)
+        except Exception as e:
+            return Response(
+                {"error": "Checkout failed", "details": str(e)},
+                status=500
+            )
 
 # 🧾 Manage Order Items (Add Item to Order)
 class OrderItemAPIView(generics.CreateAPIView):
@@ -305,7 +322,7 @@ class AdminOrderListAPIView(generics.ListAPIView):
     pagination_class = OrderPagination  # <-- Add this
 
     def get_queryset(self):
-        return Order.objects.all().order_by('id')  
+        return Order.objects.exclude(status='Pending').order_by('id')
 
 
 class AdminOrderByStatusAPIView(generics.ListAPIView):
@@ -320,37 +337,9 @@ class AdminOrderByStatusAPIView(generics.ListAPIView):
             queryset = queryset.filter(status=status)
         return queryset  
 
-class AdminForwardOrderAPIView(APIView):
-    permission_classes = [IsAdminUserOrSuperuser]
-
-    def post(self, request, pk):
-        try:
-            order = Order.objects.get(id=pk)
-        except Order.DoesNotExist:
-            return Response({'error': 'Order not found'}, status=404)
-
-        publisher_map = {}  # publisher_id -> list of items
-
-        for item in order.order_items.all():
-            publisher = item.book.created_by  # book owner
-
-            item.assigned_to = publisher
-            item.forwarded = True
-            item.save()
-
-            if publisher.id not in publisher_map:
-                publisher_map[publisher.id] = []
-            publisher_map[publisher.id].append(item)
-
-        # Create SubOrders
-        for publisher_id, items in publisher_map.items():
-            SubOrder.objects.create(order=order, publisher_id=publisher_id)
-
-        return Response({'message': 'Order forwarded to publishers'}, status=200)
-
 
 class PublisherSubOrderUpdateAPIView(APIView):
-    permission_classes = [IsPublisher]  # Only role=3 can access
+    permission_classes = [IsPublisherOrAdmin]
 
     def patch(self, request, pk):
         try:
@@ -385,20 +374,26 @@ class PublisherSubOrderUpdateAPIView(APIView):
 class PublisherSubOrderListAPIView(generics.ListAPIView):
     serializer_class = SubOrderSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = OrderPagination
 
     def get_queryset(self):
         user = self.request.user
 
-        # Only publishers or admins should access this
-        if user.role not in ['publisher', 'admin']:
+        # Only allow users with role '1' or '3'
+        if user.role not in ['1', '3']:
             return SubOrder.objects.none()
 
-        # Return all suborders belonging to logged-in publisher/admin
-        return SubOrder.objects.filter(
-            publisher=user
-        ).select_related(
-            "order", "publisher"
-        ).order_by("-created_at")
+        # Get all SubOrders for the publisher, excluding "Pending" status
+        queryset = (
+            SubOrder.objects
+            .filter(publisher=user)
+            .exclude(status__iexact='Pending')  # Exclude Pending
+            .select_related("order", "publisher")
+            .prefetch_related("order__order_items")
+            .order_by("-created_at")
+        )
+
+        return queryset
         
 
 class PublisherSubOrderByStatusAPIView(generics.ListAPIView):
@@ -407,27 +402,26 @@ class PublisherSubOrderByStatusAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        print(type(user.role), user.role)
 
-        # Only publishers or admins allowed
-        if user.role not in [1,3]:
+        # ✅ FIXED ROLE CHECK (STRING)
+        if user.role not in ['3', '1']:
             return SubOrder.objects.none()
 
-        # Get optional ?status= query param
-        status = self.request.query_params.get('status', None)
+        queryset = (
+            SubOrder.objects
+            .filter(publisher=user)
+            .select_related("order", "publisher")
+            .prefetch_related("order__order_items")
+            .order_by("-created_at")
+        )
 
-        queryset = SubOrder.objects.filter(
-            publisher=user   # restrict to logged-in publisher ONLY
-        ).select_related(
-            "order", "publisher"
-        ).prefetch_related(
-            "order__order_items"
-        ).order_by("-created_at")
-
-        # If status filter applied
+        status = self.request.query_params.get("status")
         if status:
-            queryset = queryset.filter(status=status)
+            queryset = queryset.filter(status__iexact=status)
 
         return queryset
+
         
 class SubOrderDetailAPIView(generics.RetrieveAPIView):
     serializer_class = SubOrderDetailSerializer
@@ -439,7 +433,39 @@ class SubOrderDetailAPIView(generics.RetrieveAPIView):
         user = self.request.user
 
         # Only allow access if publisher/admin owns this suborder
-        if user.role in [1, 3]:  # Admin=1, Publisher=3
+        if user.role in ['1','3']:  # Admin=1, Publisher=3
             return SubOrder.objects.filter(publisher=user)
         return SubOrder.objects.none()
         
+
+#orderlistforcustomers 
+class OrderCustomerAPIView(generics.ListCreateAPIView):
+    serializer_class = OrderSummarySerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = OrderPagination
+
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user).order_by('-created_at')
+
+#orderlistforAdmin
+class OrderAdminAPIView(generics.ListCreateAPIView):
+    serializer_class = OrderSummarySerializer
+    permission_classes = [IsAdminUserOrSuperuser]
+    pagination_class = OrderPagination
+
+    def get_queryset(self):
+        return Order.objects.all().order_by('-created_at')
+       
+
+class UserOrderDetailAPIView(generics.RetrieveAPIView):
+    serializer_class = UserOrderDetailSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user)
+
+    def get_object(self):
+        try:
+            return self.get_queryset().get(pk=self.kwargs['pk'])
+        except Order.DoesNotExist:
+            raise Http404("Order not found")

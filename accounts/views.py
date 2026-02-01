@@ -5,15 +5,17 @@ from rest_framework.authtoken.models import Token
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from rest_framework import generics, permissions
-from .models import Address
-from .models import User
+from .models import Address,User,State
+ 
 
 from django.db.models.functions import Cast
 from django.db.models import CharField
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .tokens import MyTokenObtainPairSerializer
 
-from .serializers import UserRegistrationSerializer, LoginSerializer,UserSerializer,AddressSerializer
+from .serializers import UserRegistrationSerializer, LoginSerializer,UserSerializer,AddressSerializer,StateSerializer
+
+
 
 # User Registration View
 class UserRegistrationView(views.APIView):
@@ -147,3 +149,7 @@ class MyProfileView(views.APIView):
         serializer = UserSerializer(user)
         return Response(serializer.data)        
     
+class StateListView(generics.ListCreateAPIView):
+    queryset = State.objects.filter(is_active=True).order_by('name')
+    serializer_class = StateSerializer
+    permission_classes = [AllowAny]
