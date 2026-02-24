@@ -70,6 +70,41 @@ class AuthorUpdateAPIView(APIView):
 
     def put(self, request, pk):
         return self._update(request, pk, partial=False)
+    
+    def delete(self, request, pk):
+        try:
+            author = Author.objects.get(id=pk)
+        except Author.DoesNotExist:
+            return Response(
+                {"detail": "Author not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Only admins can delete
+        if not request.user.is_staff:  # or use is_superuser
+            return Response(
+                {"detail": "Only admins can delete authors."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        author.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def get(self, request, pk=None):
+        """
+        Retrieve a specific author.
+        Publishers can see all authors.
+        """
+        authors = Author.objects.all()
+
+        if pk:
+            try:
+                author = authors.get(id=pk)
+            except Author.DoesNotExist:
+                return Response({"detail": "Author not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(AuthorSerializer(author).data)
+
+        return Response(AuthorSerializer(authors, many=True).data)
 
     def _update(self, request, pk, partial):
         try:
