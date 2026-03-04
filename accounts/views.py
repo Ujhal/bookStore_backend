@@ -6,6 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from rest_framework import generics, permissions
 from .models import Address,User,State
+from django.db.models import Q
  
 
 from django.db.models.functions import Cast
@@ -35,17 +36,17 @@ class LoginView(views.APIView):
 
     def post(self, request):
         login_data = request.data.get('loginData', {})
-
         serializer = LoginSerializer(data=login_data)
+
         if serializer.is_valid():
             user = serializer.validated_data['user']
 
-            # Generate refresh and access tokens
+            # Generate tokens
             refresh = RefreshToken.for_user(user)
             access_token = str(refresh.access_token)
             refresh_token = str(refresh)
 
-            user_data = UserSerializer(user).data  # serialize user info safely
+            user_data = UserSerializer(user).data
 
             return Response({
                 'user': user_data,
@@ -55,7 +56,6 @@ class LoginView(views.APIView):
             }, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 class AddressListCreateView(generics.ListCreateAPIView):

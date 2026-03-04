@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth import authenticate
 from .models import User,Address,State
+from django.db.models import Q
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=False)
@@ -28,12 +29,24 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         email = data.get('email')
         phone_number = data.get('phone_number')
 
-        if not email and not phone_number:
-            raise serializers.ValidationError("Either email or phone number is required.")
+        errors = {}
 
-        if phone_number:
-            if get_user_model().objects.filter(phone_number=phone_number).exists():
-                raise serializers.ValidationError("Phone number is already taken.")
+        # Require either email or phone
+        if not email and not phone_number:
+            raise serializers.ValidationError(
+                {"non_field_errors": ["Either email or phone number is required."]}
+            )
+
+        # Check email uniqueness
+        if email and get_user_model().objects.filter(email=email).exists():
+            errors["email"] = ["Email is already registered."]
+
+        # Check phone uniqueness
+        if phone_number and get_user_model().objects.filter(phone_number=phone_number).exists():
+            errors["phone_number"] = ["Phone number is already registered."]
+
+        if errors:
+            raise serializers.ValidationError(errors)
 
         return data
 
@@ -44,11 +57,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
         username = email if email else phone_number
 
-        # Set is_verified based on role
-        if role in [1, 2]:   # Admin or Customer
-            is_verified = True
-        else:                # Publisher
-            is_verified = False
+        # Auto verification logic
+        is_verified = True if role in [1, 2] else False
 
         user = get_user_model().objects.create_user(
             username=username,
@@ -63,23 +73,25 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
-
 class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField()  # username can be email or phone number
+    username = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
         username = attrs.get('username')
         password = attrs.get('password')
 
-        # Try authenticating with the username (email or phone number) and password
-        user = authenticate(username=username, password=password)
+        # Check if user exists by email or phone number
+        try:
+            user = User.objects.get(Q(email=username) | Q(phone_number=username))
+        except User.DoesNotExist:
+            raise serializers.ValidationError("No account found with this email or phone number.")
 
-        if not user:
-            raise serializers.ValidationError("Invalid credentials.")
-        
         if user.is_deleted:
             raise serializers.ValidationError("This account has been deleted.")
+
+        if not user.check_password(password):
+            raise serializers.ValidationError("Incorrect password.")
 
         return {
             'user': user,
