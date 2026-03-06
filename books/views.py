@@ -255,19 +255,44 @@ class AdminBookAPIView(APIView):
 
     def get(self, request, *args, **kwargs):
         book_id = kwargs.get("pk")
-
         books = Book.objects.all()
 
         if book_id:
             try:
                 book = books.get(id=book_id)
             except Book.DoesNotExist:
-                return Response({"detail": "Book not found."}, 
-                                status=status.HTTP_404_NOT_FOUND)
+                return Response(
+                    {"detail": "Book not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
             return Response(BookSerializer(book).data)
 
         return Response(BookSerializer(books, many=True).data)
+
+    def delete(self, request, *args, **kwargs):
+        book_id = kwargs.get("pk")
+
+        if not book_id:
+            return Response(
+                {"detail": "Book ID is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            book = Book.objects.get(id=book_id)
+        except Book.DoesNotExist:
+            return Response(
+                {"detail": "Book not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        book.delete()
+
+        return Response(
+            {"message": "Book deleted successfully"},
+            status=status.HTTP_204_NO_CONTENT
+        )
 
 # views.py
 

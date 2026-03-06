@@ -148,8 +148,30 @@ class MyProfileView(views.APIView):
 
         serializer = UserSerializer(user)
         return Response(serializer.data)        
-    
+
+# Custom permission
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    Allow read-only access for any user.
+    Write access (POST, PATCH, DELETE) only for admin (role=1).
+    """
+    def has_permission(self, request, view):
+        # Safe methods are GET, HEAD, OPTIONS
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        # Only allow admin (role=1) for unsafe methods
+        return hasattr(request.user, 'role') and request.user.role == 1
+
 class StateListView(generics.ListCreateAPIView):
     queryset = State.objects.filter(is_active=True).order_by('name')
     serializer_class = StateSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAdminOrReadOnly]
+
+    # Optional: override delete for admin check if needed on individual objects
+    def delete(self, request, *args, **kwargs):
+        if not hasattr(request.user, 'role') or request.user.role != 1:
+            return Response(
+                {"error": "Only admin can delete states."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().delete(request, *args, **kwargs)

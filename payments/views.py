@@ -9,7 +9,7 @@ from .serializers import PaymentSerializer, CreatePaymentSerializer, PaymentVeri
 from .services import create_razorpay_order, verify_payment_signature
 from orders.models import SubOrder
 from orders.utils.invoice import generate_order_invoice, generate_suborder_invoice
-
+from orders.services import reduce_book_stock
 
 # payments/views.py
 class CreatePaymentOrderAPIView(APIView):
@@ -51,6 +51,13 @@ class PaymentVerificationAPIView(APIView):
             razorpay_order_id=serializer.validated_data["razorpay_order_id"]
         )
 
+        # ✅ Prevent duplicate processing
+        if payment.payment_status == "SUCCESS":
+            return Response(
+                {"message": "Payment already verified"},
+                status=200
+            )
+
         verified = verify_payment_signature(serializer.validated_data)
 
         if not verified:
@@ -69,6 +76,9 @@ class PaymentVerificationAPIView(APIView):
         order.status = "Confirmed"
         order.transaction_id = payment.transaction_id
         order.save(update_fields=["status", "transaction_id"])
+ 
+        # ✅ Reduce Book Stock
+        reduce_book_stock(order)
 
         # ✅ Create SubOrders
         from collections import defaultdict
