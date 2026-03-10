@@ -14,7 +14,7 @@ from django.db.models import CharField
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .tokens import MyTokenObtainPairSerializer
 
-from .serializers import UserRegistrationSerializer, LoginSerializer,UserSerializer,AddressSerializer,StateSerializer
+from .serializers import UserRegistrationSerializer, LoginSerializer,UserSerializer,AddressSerializer,StateSerializer,ForgotPasswordSerializer,ChangePasswordSerializer
 
 
 
@@ -175,3 +175,47 @@ class StateListView(generics.ListCreateAPIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         return super().delete(request, *args, **kwargs)
+
+
+
+class ChangePasswordView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+
+        if serializer.is_valid():
+            user = request.user
+            user.set_password(serializer.validated_data['new_password'])
+            user.save()
+
+            return Response(
+                {"message": "Password changed successfully."},
+                status=status.HTTP_200_OK
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ForgotPasswordView(views.APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+
+        if serializer.is_valid():
+            user = serializer.validated_data["user"]
+            new_password = serializer.validated_data["new_password"]
+
+            user.set_password(new_password)
+            user.save()
+
+            return Response(
+                {"message": "Password reset successfully."},
+                status=status.HTTP_200_OK
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

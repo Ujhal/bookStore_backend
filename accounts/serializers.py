@@ -136,3 +136,46 @@ class StateSerializer(serializers.ModelSerializer):
     class Meta:
         model = State
         fields = ['id', 'name', 'code']
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        user = self.context['request'].user
+
+        # Check old password
+        if not user.check_password(data['old_password']):
+            raise serializers.ValidationError({"old_password": "Old password is incorrect."})
+
+        # Check new password match
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+
+        return data        
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    phone_number = serializers.CharField()
+    new_password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        email = data.get("email")
+        phone_number = data.get("phone_number")
+
+        try:
+            user = User.objects.get(email=email, phone_number=phone_number)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(
+                {"error": "User with this email and phone number not found."}
+            )
+
+        if data["new_password"] != data["confirm_password"]:
+            raise serializers.ValidationError(
+                {"confirm_password": "Passwords do not match."}
+            )
+
+        data["user"] = user
+        return data
