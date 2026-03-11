@@ -380,7 +380,7 @@ class PublisherSubOrderListAPIView(generics.ListAPIView):
         user = self.request.user
 
         # Only allow users with role '1' or '3'
-        if user.role not in ['1', '3']:
+        if user.role not in [1, 3]:
             return SubOrder.objects.none()
 
         # Get all SubOrders for the publisher, excluding "Pending" status
@@ -405,7 +405,7 @@ class PublisherSubOrderByStatusAPIView(generics.ListAPIView):
         print(type(user.role), user.role)
 
         # ✅ FIXED ROLE CHECK (STRING)
-        if user.role not in ['3', '1']:
+        if user.role not in [3, 1]:
             return SubOrder.objects.none()
 
         queryset = (
@@ -433,7 +433,7 @@ class SubOrderDetailAPIView(generics.RetrieveAPIView):
         user = self.request.user
 
         # Only allow access if publisher/admin owns this suborder
-        if user.role in ['1','3']:  # Admin=1, Publisher=3
+        if user.role in [1, 3]:  # Admin=1, Publisher=3
             return SubOrder.objects.filter(publisher=user)
         return SubOrder.objects.none()
         

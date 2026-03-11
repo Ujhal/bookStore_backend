@@ -117,6 +117,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class AddressSerializer(serializers.ModelSerializer):
+    state_name = serializers.ReadOnlyField(source='state.name')
     class Meta:
         model = Address
         fields = [
@@ -128,9 +129,11 @@ class AddressSerializer(serializers.ModelSerializer):
             'pincode',
             'city',
             'state',
+            'state_name', 
             'phone_number',
         ]
         read_only_fields = ['id', 'user']
+
 
 class StateSerializer(serializers.ModelSerializer):
     class Meta:

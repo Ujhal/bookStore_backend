@@ -11,11 +11,13 @@ class BookMiniSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'price', 'author', 'publisher', 'language']
 
 class AddressSerializer(serializers.ModelSerializer):
+    state_name = serializers.ReadOnlyField(source='state.name')
+
     class Meta:
         model = Address
         fields = [
             'id', 'address_line_1', 'address_line_2', 'landmark',
-            'city', 'state', 'pincode', 'phone_number'
+            'city', 'state', 'pincode', 'phone_number','state_name'
         ]
 class UserMiniSerializer(serializers.ModelSerializer):
     class Meta:
