@@ -80,7 +80,7 @@ class OrderItem(models.Model):
 
 class SubOrder(models.Model):  
     order = models.ForeignKey(Order, related_name='sub_orders', on_delete=models.CASCADE)
-    publisher = models.ForeignKey(accounts_model.User, on_delete=models.CASCADE)
+    publisher = models.ForeignKey(accounts_model.User, on_delete=models.CASCADE, blank=True, null=True)
 
     status = models.CharField(max_length=20, choices=Order.STATUS_CHOICES, default='Pending')
     tracking_number = models.CharField(max_length=50, blank=True, null=True)
