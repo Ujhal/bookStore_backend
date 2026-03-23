@@ -22,7 +22,7 @@ class AddressSerializer(serializers.ModelSerializer):
 class UserMiniSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role', 'phone_number']
+        fields = ['id', 'username', 'email', 'role', 'phone_number','first_name','last_name']
 
 class OrderItemSerializer(serializers.ModelSerializer):
     book = BookMiniSerializer(read_only=True)
@@ -141,6 +141,7 @@ class SubOrderSerializer(serializers.ModelSerializer):
         return SubOrderItemSerializer(queryset, many=True).data
 
 class SubOrderDetailSerializer(serializers.ModelSerializer):
+    user = UserMiniSerializer(source='order.user', read_only=True) 
     publisher = UserMiniSerializer(read_only=True)
     items = serializers.SerializerMethodField()
     order_details = serializers.SerializerMethodField()
@@ -151,6 +152,7 @@ class SubOrderDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'publisher',
+            'user',
             'status',
             'tracking_number',
             'remarks',
