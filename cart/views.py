@@ -21,7 +21,12 @@ class CartView(APIView):
 
         # Add or update item
         item, created = CartItem.objects.get_or_create(cart=cart, book=book)
-        item.quantity += quantity
+ 
+        if created:
+            item.quantity = quantity   # set directly
+        else:
+            item.quantity += quantity  # increment
+
         item.save()
 
 

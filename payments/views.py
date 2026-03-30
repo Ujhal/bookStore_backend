@@ -10,6 +10,8 @@ from .services import create_razorpay_order, verify_payment_signature
 from orders.models import SubOrder
 from orders.utils.invoice import generate_order_invoice, generate_suborder_invoice
 from orders.services import reduce_book_stock
+from cart.models import Cart
+
 
 # payments/views.py
 class CreatePaymentOrderAPIView(APIView):
@@ -110,6 +112,12 @@ class PaymentVerificationAPIView(APIView):
                 "warning": "Payment successful but invoice generation failed",
                 "error": str(e)
             }, status=500)
+
+        try:
+            cart = Cart.objects.get(user=request.user)
+            cart.items.all().delete()
+        except Cart.DoesNotExist:
+            pass    
 
         return Response({
             "status": "Payment successful",
