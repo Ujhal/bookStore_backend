@@ -320,7 +320,6 @@ class AdminOrderListAPIView(generics.ListAPIView):
     permission_classes = [IsAdminUserOrSuperuser]
     serializer_class = OrderSerializer
     pagination_class = OrderPagination  # <-- Add this
-
     def get_queryset(self):
         return Order.objects.exclude(status='Pending').order_by('id')
 
@@ -338,39 +337,63 @@ class AdminOrderByStatusAPIView(generics.ListAPIView):
         return queryset  
 
 
+
 class PublisherSubOrderUpdateAPIView(APIView):
     permission_classes = [IsPublisherOrAdmin]
 
     def patch(self, request, pk):
         try:
-            # Ensure the suborder belongs to the logged-in publisher
-            suborder = SubOrder.objects.get(id=pk, publisher=request.user)
-        except SubOrder.DoesNotExist:
-            return Response({'error': 'SubOrder not found or not assigned to you'}, status=404)
+            # Allow admin OR publisher
+            if request.user.is_staff:
+                suborder = SubOrder.objects.get(id=pk)
+            else:
+                suborder = SubOrder.objects.get(id=pk, publisher=request.user)
 
-        status = request.data.get('status')
+        except SubOrder.DoesNotExist:
+            return Response(
+                {'error': 'SubOrder not found or not assigned to you'},
+                status=404
+            )
+
+        status_value = request.data.get('status')
         tracking = request.data.get('tracking_number')
         remarks = request.data.get('remarks')
 
         # Validate status
-        if status and status not in dict(Order.STATUS_CHOICES):
+        if status_value and status_value not in dict(Order.STATUS_CHOICES):
             return Response({'error': 'Invalid status'}, status=400)
 
         # If status is Shipped, tracking number is required
-        if status == 'Shipped' and not tracking:
+        if status_value == 'Shipped' and not tracking:
             return Response({'error': 'Tracking number required'}, status=400)
 
-        # Update fields if provided
-        if status:
-            suborder.status = status
-        if tracking:
-            suborder.tracking_number = tracking
-        if remarks is not None:  # allow clearing remarks
-            suborder.remarks = remarks
+        with transaction.atomic():
+            # Update fields
+            if status_value:
+                suborder.status = status_value
+            if tracking:
+                suborder.tracking_number = tracking
+            if remarks is not None:
+                suborder.remarks = remarks
 
-        suborder.save()
+            suborder.save()
+
+            # 🔥 MAIN LOGIC STARTS HERE
+            order = suborder.order
+            suborders = order.sub_orders.all()
+
+            statuses = list(suborders.values_list('status', flat=True))
+
+            # Check if all statuses are the same
+            if len(set(statuses)) == 1:
+                new_status = statuses[0]
+
+                # Avoid unnecessary save
+                if order.status != new_status:
+                    order.status = new_status
+                    order.save(update_fields=['status'])
+
         return Response(SubOrderSerializer(suborder).data)
-
 class PublisherSubOrderListAPIView(generics.ListAPIView):
     serializer_class = SubOrderSerializer
     permission_classes = [IsAuthenticated]
