@@ -99,7 +99,7 @@ class OrderDetailAPIView(generics.RetrieveAPIView):
     serializer_class = OrderSerializerSpecific
     permission_classes = [IsAdminUserOrSuperuser]
     queryset = Order.objects.all()
-
+   
     def get_queryset(self):
         # If the user is an admin, return all orders; otherwise, return only the orders for the authenticated user
         if self.request.user.is_staff:  # check if user is admin

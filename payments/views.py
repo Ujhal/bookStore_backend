@@ -100,18 +100,17 @@ class PaymentVerificationAPIView(APIView):
 
         # 🧾 GENERATE INVOICES (ADD THIS PART)
         try:
-            # Order invoice
             generate_order_invoice(order)
-
-            # SubOrder invoices
             for suborder in suborders:
                 generate_suborder_invoice(suborder)
-
         except Exception as e:
-            return Response({
-                "warning": "Payment successful but invoice generation failed",
-                "error": str(e)
-            }, status=500)
+            # TODO: send to Sentry / logging
+            print(f"[Invoice Error] {e}")
+
+        return Response({
+            "status": "Payment successful",
+            "order_id": order.id
+        }, status=200)
 
         try:
             cart = Cart.objects.get(user=request.user)
