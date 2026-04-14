@@ -6,11 +6,8 @@ from django.conf import settings
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-from collections import defaultdict
 from .models import Payment
-from orders.models import Order, SubOrder
-from orders.services import reduce_book_stock
-from orders.utils.invoice import generate_order_invoice, generate_suborder_invoice
+from .utils import process_successful_payment  # ✅ use shared utility
 
 @csrf_exempt
 @require_POST
@@ -44,47 +41,12 @@ def razorpay_webhook(request):
         try:
             payment = Payment.objects.get(razorpay_order_id=razorpay_order_id)
         except Payment.DoesNotExist:
-            # Nothing we can do, but return 200 so Razorpay stops retrying
             return HttpResponse("Payment not found", status=200)
 
-        # ✅ Step 3: Idempotency check — don't process twice
-        if payment.payment_status == "SUCCESS":
-            return HttpResponse("Already processed", status=200)
-
-        # ✅ Step 4: Mark payment successful
-        payment.payment_status = "SUCCESS"
-        payment.razorpay_payment_id = razorpay_payment_id
-        payment.save()
-
-        order = payment.order
-        order.status = "Confirmed"
-        order.transaction_id = payment.transaction_id
-        order.save(update_fields=["status", "transaction_id"])
-
-        # ✅ Step 5: Reduce stock
-        reduce_book_stock(order)
-
-        # ✅ Step 6: Create SubOrders (only if not already created)
-        if not order.suborders.exists():
-            items_by_stakeholder = defaultdict(list)
-            for order_item in order.order_items.all():
-                items_by_stakeholder[order_item.book.created_by].append(order_item)
-
-            suborders = []
-            for publisher, items in items_by_stakeholder.items():
-                suborder = SubOrder.objects.create(
-                    order=order,
-                    publisher=publisher,
-                    status="Confirmed"
-                )
-                suborders.append(suborder)
-
-            # ✅ Step 7: Generate invoices
-            try:
-                generate_order_invoice(order)
-                for suborder in suborders:
-                    generate_suborder_invoice(suborder)
-            except Exception:
-                pass  # Log but don't fail — payment is already confirmed
+        # ✅ Single call handles everything idempotently
+        process_successful_payment(
+            payment=payment,
+            razorpay_payment_id=razorpay_payment_id
+        )
 
     return HttpResponse("OK", status=200)

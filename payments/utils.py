@@ -23,7 +23,7 @@ def process_successful_payment(payment, razorpay_payment_id, razorpay_signature=
 
     reduce_book_stock(order)
 
-    if not order.suborders.exists():
+    if not order.sub_orders.exists():
         items_by_stakeholder = defaultdict(list)
         for order_item in order.order_items.all():
             items_by_stakeholder[order_item.book.created_by].append(order_item)
